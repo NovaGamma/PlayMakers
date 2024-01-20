@@ -29,6 +29,11 @@ async function checkRules(image) {
     if(!imageBuffer.equals(badgedImage)) {
         console.log('Avatar is not a circle surrounded by transparent pixels')
     }
+
+    const stats = await image.stats()
+    if((stats.channels[0].mean + stats.channels[1].mean + stats.channels[2].mean)/3 < 100) {
+        console.log("Avatar's colors seems dark")
+    }
 }
 
 (async () => {
