@@ -17,21 +17,7 @@ function getMeanIntensity(stats) {
     return meanIntensity;
 }
 
-async function checkRules(path) {
-    const image = await sharp(`input/${path}`, { channels: 4 });
-
-    const metadata = await image.metadata();
-
-    if(metadata.format != "png") {
-        console.log(`Image format is not png, actual format: ${metadata.format}`);
-        return false;
-    }
-    
-    if(metadata.width != 512 || metadata.height != 512) {
-        console.log(`Avatar's size is not 512px/512px, actual size: ${metadata.width}px/${metadata.height}px`);
-        return false;
-    }
-
+async function checkAvatarInCircle(image) {
     const circleShape = Buffer.from(`<svg><circle cx="256" cy="256" r="256"/></svg>`);
     let badgedImage = await image
     .composite([{
@@ -43,14 +29,46 @@ async function checkRules(path) {
 
     let imageBuffer = await image.raw().toBuffer();
     if(!imageBuffer.equals(badgedImage)) {
-        console.log('Avatar is not a circle surrounded by transparent pixels');
         return false;
+    }
+
+    return true;
+}
+
+async function checkRules(path) {
+    const image = await sharp(`input/${path}`, { channels: 4 });
+
+    const metadata = await image.metadata();
+
+    let rulesNotRespected = "";
+
+    if(metadata.format != "png") {
+        rulesNotRespected += `Image format is not png, actual format: ${metadata.format}\n`;
+    }
+    
+    if(metadata.width != 512 || metadata.height != 512) {
+        rulesNotRespected += `Avatar's size is not 512px/512px, actual size: ${metadata.width}px/${metadata.height}px\n`;
+    }
+
+    //cannot correctly check if the avatar is in a circle if the image is not png and of correct size
+    if(rulesNotRespected == "") {
+        const avatarInCircle = checkAvatarInCircle(image)
+        if(!avatarInCircle) {
+            rulesNotRespected += 'Avatar is not a circle surrounded by transparent pixels\n';
+        }
+    } else {
+        rulesNotRespected += 'Cannot check if the avatar is in a circle\n';
     }
 
     const stats = await image.stats();
     if(getMeanIntensity(stats) < 100) {
-        console.log("Avatar's colors seems dark");
-        return false;
+        rulesNotRespected += "Avatar's colors seems dark";
+    }
+
+    //if rulesNotRespected is the same as when initialized it means all rules were respected
+    if(rulesNotRespected != "") {
+        console.log(rulesNotRespected);
+        return false
     }
 
     return true;
@@ -85,7 +103,7 @@ async function applyRules(path) {
 }
 
 (async () => {
-    const path = 'Screenshot 2024-01-21 164946.png'
+    const path = 'supernova.jpg'
 
     let respectRules = await checkRules(path);
     if(!respectRules) {
